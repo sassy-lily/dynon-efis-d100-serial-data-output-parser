@@ -85,9 +85,9 @@ def parse_line(line: str) -> Record:
     status_bitmask = line[41:47]
     internal = line[47:49]
     checksum = line[49:51]
-    checksum_computed = '%0.2X' % (sum(ord(c) for c in line[:49]) & 0xFF)
-    if checksum_computed != checksum:
-        raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed}')
+    checksum_computed = sum(ord(c) for c in line[:49]) & 0xFF
+    if checksum_computed != int(checksum, 16):
+        raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed:02X}')
     fields_discriminator = int(status_bitmask, 16) & 1
     if fields_discriminator == 0:
         altitude_displayed = altitude_displayed_or_pressure
