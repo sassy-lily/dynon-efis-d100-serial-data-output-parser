@@ -199,7 +199,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     arguments = parser.parse_args(argv)
     skipped_lines = 0
     corrupted_lines = 0
-    valid_line = 0
+    valid_lines = 0
     current_line = 0
     records = []
     with open(arguments.file, 'rt') as file:
@@ -216,7 +216,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                 corrupted_lines += 1
                 continue
             records.append(record)
-            valid_line += 1
+            valid_lines += 1
     converter = CONVERTERS[arguments.system]
     headers = get_headers(converter)
     with open('output.csv', 'wt', newline='') as file:
@@ -225,7 +225,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
         writer.writerows(get_row(record, converter) for record in records)
     logger.info('skipped lines: %d', skipped_lines)
     logger.info('corrupted lines: %d', corrupted_lines)
-    logger.info('valid lines: %d', valid_line)
+    logger.info('valid lines: %d', valid_lines)
 
 
 if __name__ == '__main__':
