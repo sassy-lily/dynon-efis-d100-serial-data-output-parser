@@ -25,6 +25,10 @@ class CorruptedRecordException(Exception):
     pass
 
 
+class InvalidSignException(Exception):
+    pass
+
+
 class Record(typing.NamedTuple):
     hour: int
     minute: int
@@ -61,7 +65,13 @@ class Conversion(typing.NamedTuple):
 
 def signed(sign: str, digits: str) -> int:
     value = int(digits)
-    return -value if sign == "-" else value
+    match sign:
+        case '+':
+            return value
+        case '-':
+            return -value
+        case _:
+            raise InvalidSignException()
 
 
 def parse_line(line: str) -> Record:
