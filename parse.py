@@ -16,8 +16,6 @@ import typing
 
 LINE_LENGTH = 51
 
-logger = logging.getLogger(__name__)
-
 
 class InvalidRecordException(Exception):
     pass
@@ -70,8 +68,7 @@ def parse_line(line: str) -> Record:
     line = line.rstrip('\n').rstrip('\r')
     line_length = len(line)
     if line_length != LINE_LENGTH:
-        logger.warning('invalid record length: expected %d, found %d', LINE_LENGTH, line_length)
-        raise InvalidRecordException()
+        raise InvalidRecordException(f'expected length {LINE_LENGTH}, found {line_length}')
     hour = int(line[0:2])
     minute = int(line[2:4])
     second = int(line[4:6])
@@ -90,8 +87,7 @@ def parse_line(line: str) -> Record:
     checksum = line[49:51]
     checksum_computed = '%0.2X' % (sum(ord(c) for c in line[:49]) & 0xFF)
     if checksum_computed != checksum:
-        logger.warning('invalid record checksum: expected %s, found %s', checksum, checksum_computed)
-        raise CorruptedRecordException()
+        raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed}')
     fields_discriminator = int(status_bitmask, 16) & 1
     if fields_discriminator == 0:
         altitude_displayed = altitude_displayed_or_pressure
@@ -186,6 +182,7 @@ def get_row(record: Record, converter: dict[str, Conversion]) -> list[float | in
 
 
 def main(argv: collections.abc.Iterable[str] | None = None) -> None:
+    logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('file', help='the file to be parsed')
     group = parser.add_mutually_exclusive_group()
@@ -207,12 +204,12 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
             current_line += 1
             try:
                 record = parse_line(line)
-            except InvalidRecordException:
-                logger.warning('line %d has been skipped: invalid record', current_line)
+            except InvalidRecordException as exception:
+                logger.warning('line %d has been skipped: invalid record (%s)', current_line, exception)
                 skipped_lines += 1
                 continue
-            except CorruptedRecordException:
-                logger.warning('line %d has been skipped: corrupted record', current_line)
+            except CorruptedRecordException as exception:
+                logger.warning('line %d has been skipped: corrupted record (%s)', current_line, exception)
                 corrupted_lines += 1
                 continue
             records.append(record)
