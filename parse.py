@@ -192,6 +192,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                        help='convert the values to imperial')
     group.add_argument('-c', '--custom', dest='system', action='store_const', const=System.CUSTOM,
                        help='convert the values to the Italian mixed system')
+    parser.add_argument('-o', '--output', dest='output', default='output.csv', help='the output file')
     parser.set_defaults(system=System.RAW)
     arguments = parser.parse_args(argv)
     skipped_lines = 0
@@ -216,7 +217,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
             valid_lines += 1
     converter = CONVERTERS[arguments.system]
     headers = get_headers(converter)
-    with open('output.csv', 'wt', newline='') as file:
+    with open(arguments.output, 'wt', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(headers)
         writer.writerows(get_row(record, converter) for record in records)
