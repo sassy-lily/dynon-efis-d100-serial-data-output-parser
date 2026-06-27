@@ -52,6 +52,7 @@ class System(enum.Enum):
     RAW = 'raw'
     METRIC = 'metric'
     IMPERIAL = 'imperial'
+    CUSTOM = 'custom'
 
 
 class Conversion(typing.NamedTuple):
@@ -149,6 +150,20 @@ CONVERTERS = {
         'lateral_g': Conversion(1/100, 2, 'g'),
         'vertical_g': Conversion(1/10, 1, 'g'),
         'angle_of_attack': Conversion(1, 0, '% of stall')
+    },
+    System.CUSTOM: {
+        'second_fraction': Conversion(1/64, 3, 's'),
+        'pitch': Conversion(1/10, 1, 'deg'),
+        'roll': Conversion(1/10, 1, 'deg'),
+        'yaw': Conversion(1, 0, 'deg'),
+        'airspeed': Conversion(1/10*3.6, 2, 'km/h'),
+        'altitude_displayed': Conversion(1*3.280840, 0, 'ft'),
+        'altitude_pressure': Conversion(1*3.280840, 0, 'ft'),
+        'turn_rate': Conversion(1/10, 1, 'deg/s'),
+        'vertical_speed': Conversion(1/10*60, 0, 'ft/min'),
+        'lateral_g': Conversion(1/100, 2, 'g'),
+        'vertical_g': Conversion(1/10, 1, 'g'),
+        'angle_of_attack': Conversion(1, 0, '% of stall')
     }
 }
 
@@ -178,6 +193,8 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                        help='convert the values to metrics')
     group.add_argument('-i', '--imperial', dest='system', action='store_const', const=System.IMPERIAL,
                        help='convert the values to imperial')
+    group.add_argument('-c', '--custom', dest='system', action='store_const', const=System.CUSTOM,
+                       help='convert the values to the Italian mixed system')
     parser.set_defaults(system=System.RAW)
     arguments = parser.parse_args(argv)
     skipped_lines = 0
