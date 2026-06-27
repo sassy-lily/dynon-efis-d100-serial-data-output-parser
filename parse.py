@@ -184,7 +184,7 @@ def get_row(record: Record, converter: dict[str, Conversion]) -> list[float | in
 def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     logger = logging.getLogger(__name__)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('file', help='the file to be parsed')
+    parser.add_argument('input', help='the input file')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-m', '--metric', dest='system', action='store_const', const=System.METRIC,
                        help='convert the values to metrics')
@@ -195,13 +195,16 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     parser.add_argument('-o', '--output', dest='output', default='output.csv', help='the output file')
     parser.set_defaults(system=System.RAW)
     arguments = parser.parse_args(argv)
+    converter = CONVERTERS[arguments.system]
+    headers = get_headers(converter)
     skipped_lines = 0
     corrupted_lines = 0
     valid_lines = 0
     current_line = 0
-    records = []
-    with open(arguments.file, 'rt') as file:
-        for line in file:
+    with open(arguments.input, 'rt') as input_file, open(arguments.output, 'wt', newline='') as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(headers)
+        for line in input_file:
             current_line += 1
             try:
                 record = parse_line(line)
@@ -213,14 +216,9 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                 logger.warning('line %d has been skipped: corrupted record (%s)', current_line, exception)
                 corrupted_lines += 1
                 continue
-            records.append(record)
+            row = get_row(record, converter)
+            writer.writerow(row)
             valid_lines += 1
-    converter = CONVERTERS[arguments.system]
-    headers = get_headers(converter)
-    with open(arguments.output, 'wt', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(headers)
-        writer.writerows(get_row(record, converter) for record in records)
     logger.info('skipped lines: %d', skipped_lines)
     logger.info('corrupted lines: %d', corrupted_lines)
     logger.info('valid lines: %d', valid_lines)
