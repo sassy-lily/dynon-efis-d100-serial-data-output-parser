@@ -54,12 +54,18 @@ class System(enum.Enum):
     IMPERIAL = 'imperial'
 
 
+class Conversion(typing.NamedTuple):
+    factor: float
+    decimals: int
+    units: str
+
+
 def signed(sign: str, digits: str) -> int:
     value = int(digits)
     return -value if sign == "-" else value
 
 
-def parse(line: str) -> Record:
+def parse_line(line: str) -> Record:
     line = line.rstrip('\n').rstrip('\r')
     line_length = len(line)
     if line_length != LINE_LENGTH:
@@ -101,6 +107,69 @@ def parse(line: str) -> Record:
                   status_bitmask, internal, checksum)
 
 
+CONVERTERS = {
+    System.RAW: {
+        'second_fraction': Conversion(1, 0, '1/64 s'),
+        'pitch': Conversion(1, 0, '1/10 deg'),
+        'roll': Conversion(1, 0, '1/10 deg'),
+        'yaw': Conversion(1, 0, 'deg'),
+        'airspeed': Conversion(1, 0, '1/10 m/s'),
+        'altitude_displayed': Conversion(1, 0, 'm'),
+        'altitude_pressure': Conversion(1, 0, 'm'),
+        'turn_rate': Conversion(1, 0, '1/10 deg/s'),
+        'vertical_speed': Conversion(1, 0, '1/10 ft/s'),
+        'lateral_g': Conversion(1, 0, '1/100 g'),
+        'vertical_g': Conversion(1, 0, '1/10 g'),
+        'angle_of_attack': Conversion(1, 0, '% of stall')
+    },
+    System.METRIC: {
+        'second_fraction': Conversion(1/64, 3, 's'),
+        'pitch': Conversion(1/10, 1, 'deg'),
+        'roll': Conversion(1/10, 1, 'deg'),
+        'yaw': Conversion(1, 0, 'deg'),
+        'airspeed': Conversion(1/10*3.6, 2, 'km/h'),
+        'altitude_displayed': Conversion(1, 0, 'm'),
+        'altitude_pressure': Conversion(1, 0, 'm'),
+        'turn_rate': Conversion(1/10, 1, 'deg/s'),
+        'vertical_speed': Conversion(1/10*0.3048, 2, 'm/s'),
+        'lateral_g': Conversion(1/100, 2, 'g'),
+        'vertical_g': Conversion(1/10, 1, 'g'),
+        'angle_of_attack': Conversion(1, 0, '% of stall')
+    },
+    System.IMPERIAL: {
+        'second_fraction': Conversion(1/64, 3, 's'),
+        'pitch': Conversion(1/10, 1, 'deg'),
+        'roll': Conversion(1/10, 1, 'deg'),
+        'yaw': Conversion(1, 0, 'deg'),
+        'airspeed': Conversion(1/10*1.943844, 2, 'kt'),
+        'altitude_displayed': Conversion(1*3.280840, 0, 'ft'),
+        'altitude_pressure': Conversion(1*3.280840, 0, 'ft'),
+        'turn_rate': Conversion(1/10, 1, 'deg/s'),
+        'vertical_speed': Conversion(1/10*60, 0, 'ft/min'),
+        'lateral_g': Conversion(1/100, 2, 'g'),
+        'vertical_g': Conversion(1/10, 1, 'g'),
+        'angle_of_attack': Conversion(1, 0, '% of stall')
+    }
+}
+
+
+def get_headers(converter: dict[str, Conversion]) -> list[str]:
+    return [f'{name} ({converter[name].units})' if name in converter else name for name in Record._fields]
+
+
+def get_row(record: Record, converter: dict[str, Conversion]) -> list[float | int | str | None]:
+    values = []
+    for name, value in zip(Record._fields, record):
+        conversion = converter.get(name)
+        if conversion is None or value is None:
+            values.append(value)
+        else:
+            scaled = value * conversion.factor
+            rounded = round(scaled, conversion.decimals) if conversion.decimals else round(scaled)
+            values.append(rounded)
+    return values
+
+
 def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('file', help='the file to be parsed')
@@ -120,7 +189,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
         for line in file:
             current_line += 1
             try:
-                record = parse(line)
+                record = parse_line(line)
             except InvalidRecordException:
                 logger.warning('line %d has been skipped: invalid record', current_line)
                 skipped_lines += 1
@@ -131,11 +200,12 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                 continue
             records.append(record)
             valid_line += 1
-    # TODO Convert the values to the chosen measurements system, if requested.
+    converter = CONVERTERS[arguments.system]
+    headers = get_headers(converter)
     with open('output.csv', 'wt', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(Record._fields)
-        writer.writerows(records)
+        writer.writerow(headers)
+        writer.writerows(get_row(record, converter) for record in records)
     logger.info('skipped lines: %d', skipped_lines)
     logger.info('corrupted lines: %d', corrupted_lines)
     logger.info('valid lines: %d', valid_line)
