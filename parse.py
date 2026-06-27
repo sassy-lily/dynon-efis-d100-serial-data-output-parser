@@ -79,6 +79,13 @@ def parse_line(line: str) -> Record:
     line_length = len(line)
     if line_length != LINE_LENGTH:
         raise InvalidRecordException(f'expected length {LINE_LENGTH}, found {line_length}')
+    checksum = line[49:51]
+    checksum_computed = sum(ord(c) for c in line[:49]) & 0xFF
+    try:
+        if checksum_computed != int(checksum, 16):
+            raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed:02X}')
+    except ValueError:
+        raise CorruptedRecordException(f'expected hex checksum, found {checksum}')
     hour = int(line[0:2])
     minute = int(line[2:4])
     second = int(line[4:6])
@@ -94,11 +101,10 @@ def parse_line(line: str) -> Record:
     angle_of_attack = int(line[39:41])
     status_bitmask = line[41:47]
     internal = line[47:49]
-    checksum = line[49:51]
-    checksum_computed = sum(ord(c) for c in line[:49]) & 0xFF
-    if checksum_computed != int(checksum, 16):
-        raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed:02X}')
-    fields_discriminator = int(status_bitmask, 16) & 1
+    try:
+        fields_discriminator = int(status_bitmask, 16) & 1
+    except ValueError:
+        raise CorruptedRecordException(f'expected hex status bitmask, found {status_bitmask}')
     if fields_discriminator == 0:
         altitude_displayed = altitude_displayed_or_pressure
         altitude_pressure = None
