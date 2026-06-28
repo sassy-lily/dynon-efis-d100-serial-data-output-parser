@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: dynon-efis-d100-parser-linux-x86_64
+            pyinstaller_name: dynon-efis-d100-parser
+          - os: windows-latest
+            asset_name: dynon-efis-d100-parser-windows-x86_64.exe
+            pyinstaller_name: dynon-efis-d100-parser
+          - os: macos-latest
+            asset_name: dynon-efis-d100-parser-macos-arm64
+            pyinstaller_name: dynon-efis-d100-parser
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build executable
+        run: pyinstaller --onefile --name "${{ matrix.pyinstaller_name }}" parse.py
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p staging
+          if [ -f "dist/${{ matrix.pyinstaller_name }}.exe" ]; then
+            cp "dist/${{ matrix.pyinstaller_name }}.exe" "staging/${{ matrix.asset_name }}"
+          else
+            cp "dist/${{ matrix.pyinstaller_name }}" "staging/${{ matrix.asset_name }}"
+          fi
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: staging/${{ matrix.asset_name }}
+          fail_on_unmatched_files: true
