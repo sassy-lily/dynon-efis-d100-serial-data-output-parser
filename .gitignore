@@ -17,3 +17,6 @@ venv/
 
 # Generated parser output
 output.csv
+
+# Generated charts (charts.py)
+charts/

@@ -76,6 +76,45 @@ the altitude column carries displayed or pressure altitude, and whether the
 turn-rate column carries turn rate or vertical speed. See the format reference
 for the full bit-level meaning.
 
+## Charting
+
+`charts.py` renders a set of example charts from a parsed CSV. Unlike the
+parser, it needs two third-party libraries (kept out of the parser's runtime
+dependencies):
+
+```bash
+pip install pandas matplotlib
+```
+
+```bash
+python charts.py <input.csv> [-o outdir] [--dpi N] [--format FMT] [--show]
+```
+
+| Option       | Default  | Description                                            |
+| ------------ | -------- | ------------------------------------------------------ |
+| `-o`, `--outdir` | `charts` | Directory for the rendered files                   |
+| `--dpi`      | `200`    | Raster resolution (ignored by vector formats)          |
+| `--format`   | `png`    | One of `png`, `svg`, `pdf`, `jpg`, `webp`              |
+| `--show`     | —        | Also open interactive windows                          |
+
+It is unit-agnostic: each field is located by name and its unit is read from the
+CSV header, so the same script works on `RAW`, `-m`, `-i`, or `-c` output. It
+produces a time-series of altitude and airspeed, an attitude multi-panel,
+vertical speed and G-load, a G-load histogram, a heading "rose" (polar
+histogram), an airspeed-vs-altitude envelope scatter, and a dead-reckoned ground
+track.
+
+The ground track integrates heading and airspeed frame-by-frame; the stream
+carries **no GPS**, so it captures the *shape* of the flight (no wind correction
+and no absolute position), not navigation-grade position.
+
+### Example
+
+```bash
+python parse.py 2026-06-27.bin -c -o 2026-06-27.csv
+python charts.py 2026-06-27.csv --format svg
+```
+
 ## Data format
 
 The complete wire format — field offsets, the status bitmask, the checksum
