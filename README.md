@@ -38,7 +38,7 @@ python parse.py <input_file> [-o output.csv] [-m | -i | -c]
 | *(default)*       | `RAW`       | Raw device units, no conversion              |
 | `-m`, `--metric`  | `METRIC`    | km/h, m/s, m                                 |
 | `-i`, `--imperial`| `IMPERIAL`  | knots, feet, ft/min                          |
-| `-c`, `--custom`  | `CUSTOM`    | Italian mixed system (km/h + feet)           |
+| `-c`, `--custom`  | `CUSTOM`    | Custom mixed system (km/h + feet)            |
 | `-o`, `--output`  | —           | Output CSV path (default: `output.csv`)      |
 
 The unit-system flags are mutually exclusive.

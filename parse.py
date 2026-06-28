@@ -207,7 +207,7 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     group.add_argument('-i', '--imperial', dest='system', action='store_const', const=System.IMPERIAL,
                        help='convert the values to imperial')
     group.add_argument('-c', '--custom', dest='system', action='store_const', const=System.CUSTOM,
-                       help='convert the values to the Italian mixed system')
+                       help='convert the values to the custom mixed system')
     parser.add_argument('-o', '--output', dest='output', default='output.csv', help='the output file')
     parser.set_defaults(system=System.RAW)
     arguments = parser.parse_args(argv)
