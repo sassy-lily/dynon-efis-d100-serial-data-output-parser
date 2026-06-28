@@ -84,15 +84,18 @@ algorithm, and the unit-conversion formulas — is documented in
 
 ## Error handling
 
-Each input line is validated independently:
+Each input line is validated independently, so a single bad record never aborts
+the run:
 
 - Records of the wrong length (`InvalidRecordException`) are skipped and counted
   as *skipped lines*.
-- Records that fail the checksum or contain an unparseable hex status field
-  (`CorruptedRecordException`) are skipped and counted as *corrupted lines*.
+- Records that fail the checksum (`CorruptedRecordException`) are skipped and
+  counted as *corrupted lines*.
+- Records whose fields are otherwise unparseable — a non-hex checksum or status
+  field, a non-numeric value, or an invalid sign character — raise a plain
+  `ValueError` and are likewise skipped and counted as *corrupted lines*.
 
 Valid, skipped, and corrupted line counts are reported at the end of the run.
-Malformed sign or numeric fields are not caught and will surface as an error.
 
 ## Testing
 

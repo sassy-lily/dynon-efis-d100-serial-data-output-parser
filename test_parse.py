@@ -6,12 +6,13 @@ docs/FORMAT.md (Appendix A of the EFIS-D100 Pilot's User Guide). The golden
 vectors here come from that document's worked example and from real lines in
 sample.bin.
 
-Note on two intentionally-pinned quirks (see the TestUncaughtFieldErrors class):
-a bad sign character or a non-digit numeric field raises, respectively,
-InvalidSignException or a bare ValueError, and neither parse_line() nor main()
-catches them — so such a line crashes the run rather than being counted as
-corrupted. These tests document the *current* behaviour; they are not an
-endorsement of it.
+On the error taxonomy (see TestParseLineErrors and TestFieldValueErrors):
+parse_line() raises InvalidRecordException for a wrong-length frame and
+CorruptedRecordException for a structurally valid frame whose checksum does not
+match. Any other malformed field — a non-hex checksum or status, a non-digit
+numeric field, or a bad sign character — surfaces as a plain ValueError. main()
+catches all three and counts the line as skipped (invalid length) or corrupted
+(everything else), so no malformed line ever crashes the run.
 """
 
 import csv
@@ -24,7 +25,6 @@ from parse import (
     CONVERTERS,
     CorruptedRecordException,
     InvalidRecordException,
-    InvalidSignException,
     Record,
     System,
     get_headers,
@@ -173,7 +173,7 @@ class TestSigned:
 
     @pytest.mark.parametrize("sign", [" ", "x", "0", "*", ""])
     def test_invalid_sign_raises(self, sign):
-        with pytest.raises(InvalidSignException):
+        with pytest.raises(ValueError):
             signed(sign, "001")
 
 
@@ -271,32 +271,35 @@ class TestParseLineErrors:
             parse_line(good[:49] + wrong_cksum)
         assert wrong_cksum in str(info.value)
 
-    def test_non_hex_checksum_raises_corrupted(self):
-        with pytest.raises(CorruptedRecordException):
+    def test_non_hex_checksum_raises_value_error(self):
+        # A non-hex checksum can't be parsed as int → bare ValueError, distinct
+        # from the CorruptedRecordException reserved for a valid-hex mismatch.
+        with pytest.raises(ValueError):
             parse_line(EXAMPLE_LINE[:49] + "ZZ")
 
-    def test_non_hex_status_bitmask_raises_corrupted(self):
+    def test_non_hex_status_bitmask_raises_value_error(self):
         # Build a line whose checksum is valid but whose status is not hex, so we
         # reach the int(status, 16) failure rather than the checksum failure.
         line = make_line(status="GGGGGG")
-        with pytest.raises(CorruptedRecordException):
+        with pytest.raises(ValueError):
             parse_line(line)
 
 
-class TestUncaughtFieldErrors:
+class TestFieldValueErrors:
     """
-    These inputs are NOT wrapped into the Invalid/Corrupted taxonomy; they
-    propagate raw. Pinned to document current behaviour (see module docstring).
+    A structurally valid frame (right length, matching checksum) whose fields
+    are nonetheless unparseable surfaces as a plain ValueError from parse_line();
+    main() catches these and counts the line as corrupted (see TestMain).
     """
 
-    def test_bad_sign_char_propagates_invalid_sign(self):
+    def test_bad_sign_char_raises_value_error(self):
         # Corrupt the pitch sign (index 8) to a non-sign char, keep checksum valid.
         body = EXAMPLE_LINE[:8] + "x" + EXAMPLE_LINE[9:49]
         line = body_with_checksum(body)
-        with pytest.raises(InvalidSignException):
+        with pytest.raises(ValueError):
             parse_line(line)
 
-    def test_non_digit_numeric_field_propagates_value_error(self):
+    def test_non_digit_numeric_field_raises_value_error(self):
         # Corrupt the hour (index 0:2) to letters, keep checksum valid.
         body = "aa" + EXAMPLE_LINE[2:49]
         line = body_with_checksum(body)
@@ -473,6 +476,24 @@ class TestMain:
         assert "skipped lines: 1" in log_text
         assert "corrupted lines: 1" in log_text
         assert "valid lines: 2" in log_text
+
+    def test_field_value_error_line_is_counted_corrupted(self, tmp_path, caplog):
+        # A frame with a valid checksum but a non-digit field raises ValueError in
+        # parse_line; main() must count it as corrupted rather than crash.
+        bad_field_line = body_with_checksum("aa" + EXAMPLE_LINE[2:49])
+        in_path = _write_input(tmp_path, [EXAMPLE_LINE, bad_field_line])
+        out_path = tmp_path / "out.csv"
+
+        with caplog.at_level("INFO", logger="parse"):
+            parse.main([str(in_path), "-o", str(out_path)])
+
+        with out_path.open(newline="") as handle:
+            rows = list(csv.reader(handle))
+
+        assert len(rows) == 2  # header + 1 valid row
+        log_text = caplog.text
+        assert "corrupted lines: 1" in log_text
+        assert "valid lines: 1" in log_text
 
     @pytest.mark.parametrize(
         "flag, system",

@@ -25,10 +25,6 @@ class CorruptedRecordException(Exception):
     pass
 
 
-class InvalidSignException(Exception):
-    pass
-
-
 class Record(typing.NamedTuple):
     hour: int
     minute: int
@@ -71,7 +67,7 @@ def signed(sign: str, digits: str) -> int:
         case '-':
             return -value
         case _:
-            raise InvalidSignException()
+            raise ValueError(f'expected sign, found {sign}')
 
 
 def parse_line(line: str) -> Record:
@@ -80,12 +76,10 @@ def parse_line(line: str) -> Record:
     if line_length != LINE_LENGTH:
         raise InvalidRecordException(f'expected length {LINE_LENGTH}, found {line_length}')
     checksum = line[49:51]
-    checksum_computed = sum(ord(c) for c in line[:49]) & 0xFF
-    try:
-        if checksum_computed != int(checksum, 16):
-            raise CorruptedRecordException(f'expected checksum {checksum}, found {checksum_computed:02X}')
-    except ValueError as exception:
-        raise CorruptedRecordException(f'expected hex checksum, found {checksum}') from exception
+    checksum_value = int(checksum, 16)
+    computed_checksum_value = sum(ord(c) for c in line[:49]) & 0xFF
+    if computed_checksum_value != checksum_value:
+        raise CorruptedRecordException(f'expected checksum {checksum}, found {computed_checksum_value:02X}')
     hour = int(line[0:2])
     minute = int(line[2:4])
     second = int(line[4:6])
@@ -101,10 +95,7 @@ def parse_line(line: str) -> Record:
     angle_of_attack = int(line[39:41])
     status_bitmask = line[41:47]
     internal = line[47:49]
-    try:
-        fields_discriminator = int(status_bitmask, 16) & 1
-    except ValueError as exception:
-        raise CorruptedRecordException(f'expected hex status bitmask, found {status_bitmask}') from exception
+    fields_discriminator = int(status_bitmask, 16) & 1
     if fields_discriminator == 0:
         altitude_displayed = altitude_displayed_or_pressure
         altitude_pressure = None
@@ -231,6 +222,10 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
                     continue
                 except CorruptedRecordException as exception:
                     logger.warning('line %d has been skipped: corrupted record (%s)', current_line, exception)
+                    corrupted_lines += 1
+                    continue
+                except ValueError as exception:
+                    logger.warning('line %d has been skipped: invalid values (%s)', current_line, exception)
                     corrupted_lines += 1
                     continue
                 row = get_row(record, converter)
