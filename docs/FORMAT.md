@@ -26,7 +26,7 @@ Python slice.
 | 1 | Hour | 1 | 2 | `[0:2]` | 00–23, Zulu time (internal clock) |
 | 2 | Minute | 3 | 2 | `[2:4]` | 00–59 |
 | 3 | Second | 5 | 2 | `[4:6]` | 00–59 |
-| 4 | Fractions | 7 | 2 | `[6:8]` | 00–63, counter of 1/64 second |
+| 4 | Fractions | 7 | 2 | `[6:8]` | 00–63, free-running 1/64 s frame counter (see *Time fields* note) |
 | 5 | Pitch sign | 9 | 1 | `[8]` | `+`/`-` (`+` = pitched up) |
 | 6 | Pitch | 10 | 3 | `[9:12]` | 000–900, units of 1/10° |
 | 7 | Roll sign | 13 | 1 | `[12]` | `+`/`-` (`+` = banked right) |
@@ -45,6 +45,34 @@ Python slice.
 | 20 | Status bitmask | 42 | 6 | `[41:47]` | 24-bit value, ASCII-hex |
 | 21 | Internal use | 48 | 2 | `[47:49]` | ignore |
 | 22 | Checksum | 50 | 2 | `[49:51]` | ASCII-hex, see below |
+
+### Time fields — the Fractions counter
+
+The first three time fields (hour, minute, second) come from the EFIS's internal
+**real-time clock** (Zulu). The fourth field, **Fractions**, does *not*. The
+authoritative D10A/D100 manuals define chars 7–8 as:
+
+> "00 to 63, counter for 1/64 second. **Data output frequency.**"
+
+It is a **free-running 6-bit frame counter** driven by the serial output engine:
+it increments by exactly `+1` on every emitted frame and wraps `63 → 0`. The
+device emits frames at a *nominal* 64 Hz, so the counter completes one cycle per
+second *on average* — but it is **not** a sub-second offset derived from the
+real-time clock, and the two are **not phase-locked**:
+
+- The counter is **never reset on a second boundary.** Its `63 → 0` wrap falls at
+  a fixed-but-arbitrary phase inside the RTC second (wherever the counter happened
+  to sit when the clock started), so the wrap and the seconds tick generally do
+  not coincide.
+- The instantaneous output rate **jitters.** In a 221,309-record capture the rate
+  averaged *exactly* 64.0000 frames per wall-clock second, yet individual seconds
+  held anywhere from **55 to 73 frames**. Because the RTC second and the frame
+  counter advance on independent clocks, their phase drifts continuously.
+
+The practical consequence: in real captures the Fractions counter rolls over
+mid-second, and the seconds value advances while Fractions is non-zero. This is
+**expected behavior, not corruption** — see *Converting raw values* below for how
+this affects timestamps.
 
 ### Status bitmask — bit 0 (LSB)
 
@@ -103,11 +131,14 @@ value as `0xHH_LLLL` (high byte = bits 16–23, low 16 = bits 0–15):
 1–23 as opaque internal data — safely ignorable, exactly as every other
 implementation does.
 
-> Two related claims that surfaced during research but did **not** hold up:
-> the separate "Internal use" slot at chars 48–49 is sometimes called a
-> "Product ID", but the authoritative D10A/D100 PDFs say "internal use"; and
-> there is **no** 1/64-second *frame counter* field (the fractions field at
-> chars 7–8 is a timestamp sub-second, not a free-running counter).
+> A related claim that surfaced during research did **not** hold up: the separate
+> "Internal use" slot at chars 48–49 is sometimes called a "Product ID", but the
+> authoritative D10A/D100 PDFs say "internal use".
+>
+> Conversely, the Fractions field (chars 7–8) **is** a free-running 1/64 s frame
+> counter, exactly as the manual states ("counter for 1/64 second. Data output
+> frequency."). It is *not* a sub-second offset of the real-time clock — see the
+> *Time fields* note above.
 
 ### Checksum
 
@@ -124,7 +155,7 @@ checksum == (sum(ord(c) for c in record[:49])) & 0xFF
 00082119+058-00541301200+9141+011-01+15003EA0C701A4
 ```
 
-Decodes to: 00:08:21 + 19/64 s, pitch +5.8°, roll −5.4°, heading 130°,
+Decodes to: 00:08:21 (frame counter 19/64), pitch +5.8°, roll −5.4°, heading 130°,
 airspeed 120.0 (×0.1 m/s), altitude +9141 m, field-14 +011, lateral *g* −0.01,
 vertical *g* +1.5, AoA 00%, status `3EA0C7` (bit 0 = 1 → altitude is pressure
 altitude, field 14 is VSI = 1.1 ft/s), checksum `A4`.
@@ -197,7 +228,8 @@ engineering units:
 
 | Quantity | From raw | Formula | Metric unit |
 |---|---|---|---|
-| Time | hour, minute, second, frac64 | `second + frac64/64` | s (with HH:MM:SS) |
+| Time (clock) | hour, minute, second | `HH:MM:SS` | s (1 s resolution) |
+| Frame index | frac64 | `frac64` (a counter, not an offset) | frames (0–63) |
 | Pitch | `pitch` | `pitch / 10` | degrees (°) |
 | Roll | `roll` | `roll / 10` | degrees (°) |
 | Heading | `yaw` | `yaw` | degrees (°) |
@@ -212,6 +244,13 @@ engineering units:
 | Angle of attack | `aoa` | `aoa` | % of stall |
 
 Notes:
+- **Time:** the wall-clock timestamp has **1-second resolution** (HH:MM:SS from the
+  internal RTC). Do **not** compute a sub-second time as `second + frac64/64`:
+  Fractions is a free-running frame counter, not a phase-locked offset, so it is
+  not reset on the second boundary and adding it produces a timestamp that can run
+  ahead of or behind the true sub-second position (see the *Time fields* note).
+  Use `frac64` only as a 0–63 frame index *within* the nominal 64 Hz stream — e.g.
+  to order frames or detect dropped frames (a gap in the otherwise `+1` sequence).
 - Altitude is **already metric** (metres) on the wire — no scaling is needed.
 - VSI is encoded in **feet/second** even though everything else is SI, so a metric
   VSI requires the foot→metre factor (0.3048).
@@ -225,7 +264,8 @@ These are the conventional units shown on an EFIS (knots, feet, feet-per-minute)
 
 | Quantity | From raw | Formula | Imperial unit |
 |---|---|---|---|
-| Time | hour, minute, second, frac64 | `second + frac64/64` | s (with HH:MM:SS) |
+| Time (clock) | hour, minute, second | `HH:MM:SS` | s (1 s resolution) |
+| Frame index | frac64 | `frac64` (a counter, not an offset) | frames (0–63) |
 | Pitch | `pitch` | `pitch / 10` | degrees (°) |
 | Roll | `roll` | `roll / 10` | degrees (°) |
 | Heading | `yaw` | `yaw` | degrees (°) |
