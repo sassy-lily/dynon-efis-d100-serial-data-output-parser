@@ -45,7 +45,7 @@ EXAMPLE_RECORD = Record(
     hour=0,
     minute=8,
     second=21,
-    second_fraction=19,
+    frame=19,
     pitch=58,
     roll=-54,
     yaw=130,
@@ -101,7 +101,7 @@ def make_line(
     hour=9,
     minute=9,
     second=41,
-    second_fraction=44,
+    frame=44,
     pitch=18,
     roll=6,
     yaw=103,
@@ -126,7 +126,7 @@ def make_line(
         f"{hour:02d}"
         f"{minute:02d}"
         f"{second:02d}"
-        f"{second_fraction:02d}"
+        f"{frame:02d}"
         f"{_signed_field(pitch, 3)}"
         f"{_signed_field(roll, 4)}"
         f"{yaw:03d}"
@@ -402,7 +402,7 @@ class TestGetRow:
     @pytest.mark.parametrize(
         "system, field, expected",
         [
-            (System.METRIC, "second_fraction", 0.297),
+            (System.METRIC, "frame", 19),   # frame counter, passed through unscaled
             (System.METRIC, "pitch", 5.8),
             (System.METRIC, "roll", -5.4),
             (System.METRIC, "airspeed", 432.0),

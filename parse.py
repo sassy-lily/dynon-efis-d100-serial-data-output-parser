@@ -29,7 +29,7 @@ class Record(typing.NamedTuple):
     hour: int
     minute: int
     second: int
-    second_fraction: int
+    frame: int
     pitch: int
     roll: int
     yaw: int
@@ -83,7 +83,7 @@ def parse_line(line: str) -> Record:
     hour = int(line[0:2])
     minute = int(line[2:4])
     second = int(line[4:6])
-    second_fraction = int(line[6:8])
+    frame = int(line[6:8])
     pitch = signed(line[8], line[9:12])
     roll = signed(line[12], line[13:17])
     yaw = int(line[17:20])
@@ -106,14 +106,13 @@ def parse_line(line: str) -> Record:
         altitude_pressure = altitude_displayed_or_pressure
         turn_rate = None
         vertical_speed = turn_rate_or_vertical_speed
-    return Record(hour, minute, second, second_fraction, pitch, roll, yaw, airspeed, altitude_displayed,
-                  altitude_pressure, turn_rate, vertical_speed, lateral_g, vertical_g, angle_of_attack,
-                  status_bitmask, internal, checksum)
+    return Record(hour, minute, second, frame, pitch, roll, yaw, airspeed, altitude_displayed, altitude_pressure,
+                  turn_rate, vertical_speed, lateral_g, vertical_g, angle_of_attack, status_bitmask, internal, checksum)
 
 
 CONVERTERS = {
     System.RAW: {
-        'second_fraction': Conversion(1, 0, '1/64 s'),
+        'frame': Conversion(1, 0, 'frame'),
         'pitch': Conversion(1, 0, '1/10 deg'),
         'roll': Conversion(1, 0, '1/10 deg'),
         'yaw': Conversion(1, 0, 'deg'),
@@ -127,7 +126,7 @@ CONVERTERS = {
         'angle_of_attack': Conversion(1, 0, '% of stall')
     },
     System.METRIC: {
-        'second_fraction': Conversion(1/64, 3, 's'),
+        'frame': Conversion(1, 0, 'frame'),
         'pitch': Conversion(1/10, 1, 'deg'),
         'roll': Conversion(1/10, 1, 'deg'),
         'yaw': Conversion(1, 0, 'deg'),
@@ -141,7 +140,7 @@ CONVERTERS = {
         'angle_of_attack': Conversion(1, 0, '% of stall')
     },
     System.IMPERIAL: {
-        'second_fraction': Conversion(1/64, 3, 's'),
+        'frame': Conversion(1, 0, 'frame'),
         'pitch': Conversion(1/10, 1, 'deg'),
         'roll': Conversion(1/10, 1, 'deg'),
         'yaw': Conversion(1, 0, 'deg'),
@@ -155,7 +154,7 @@ CONVERTERS = {
         'angle_of_attack': Conversion(1, 0, '% of stall')
     },
     System.CUSTOM: {
-        'second_fraction': Conversion(1/64, 3, 's'),
+        'frame': Conversion(1, 0, 'frame'),
         'pitch': Conversion(1/10, 1, 'deg'),
         'roll': Conversion(1/10, 1, 'deg'),
         'yaw': Conversion(1, 0, 'deg'),

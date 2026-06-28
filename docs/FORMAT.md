@@ -193,7 +193,7 @@ def decode(line):
         "hour":   int(line[0:2]),
         "minute": int(line[2:4]),
         "second": int(line[4:6]),
-        "frac64": int(line[6:8]),        # 1/64 s
+        "frame":  int(line[6:8]),        # free-running 1/64 s frame counter, 0–63
         "pitch":  signed(line[8],  line[9:12]),    # 1/10 deg
         "roll":   signed(line[12], line[13:17]),   # 1/10 deg
         "yaw":    int(line[17:20]),                # deg
@@ -229,7 +229,7 @@ engineering units:
 | Quantity | From raw | Formula | Metric unit |
 |---|---|---|---|
 | Time (clock) | hour, minute, second | `HH:MM:SS` | s (1 s resolution) |
-| Frame index | frac64 | `frac64` (a counter, not an offset) | frames (0–63) |
+| Frame index | frame | `frame` (a counter, not an offset) | frames (0–63) |
 | Pitch | `pitch` | `pitch / 10` | degrees (°) |
 | Roll | `roll` | `roll / 10` | degrees (°) |
 | Heading | `yaw` | `yaw` | degrees (°) |
@@ -245,11 +245,11 @@ engineering units:
 
 Notes:
 - **Time:** the wall-clock timestamp has **1-second resolution** (HH:MM:SS from the
-  internal RTC). Do **not** compute a sub-second time as `second + frac64/64`:
+  internal RTC). Do **not** compute a sub-second time as `second + frame/64`:
   Fractions is a free-running frame counter, not a phase-locked offset, so it is
   not reset on the second boundary and adding it produces a timestamp that can run
   ahead of or behind the true sub-second position (see the *Time fields* note).
-  Use `frac64` only as a 0–63 frame index *within* the nominal 64 Hz stream — e.g.
+  Use `frame` only as a 0–63 frame index *within* the nominal 64 Hz stream — e.g.
   to order frames or detect dropped frames (a gap in the otherwise `+1` sequence).
 - Altitude is **already metric** (metres) on the wire — no scaling is needed.
 - VSI is encoded in **feet/second** even though everything else is SI, so a metric
@@ -265,7 +265,7 @@ These are the conventional units shown on an EFIS (knots, feet, feet-per-minute)
 | Quantity | From raw | Formula | Imperial unit |
 |---|---|---|---|
 | Time (clock) | hour, minute, second | `HH:MM:SS` | s (1 s resolution) |
-| Frame index | frac64 | `frac64` (a counter, not an offset) | frames (0–63) |
+| Frame index | frame | `frame` (a counter, not an offset) | frames (0–63) |
 | Pitch | `pitch` | `pitch / 10` | degrees (°) |
 | Roll | `roll` | `roll / 10` | degrees (°) |
 | Heading | `yaw` | `yaw` | degrees (°) |
