@@ -79,11 +79,11 @@ for the full bit-level meaning.
 ## Charting
 
 `charts.py` renders a set of example charts from a parsed CSV. Unlike the
-parser, it needs two third-party libraries (kept out of the parser's runtime
-dependencies):
+parser, it needs two third-party libraries (`pandas` and `matplotlib`), kept out
+of the parser's runtime dependencies as the `charts` extra:
 
 ```bash
-pip install pandas matplotlib
+pip install -e ".[charts]"
 ```
 
 ```bash

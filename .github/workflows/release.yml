@@ -10,21 +10,21 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.asset_name }}
-    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.tool.name }} (${{ matrix.os.label }})
+    runs-on: ${{ matrix.os.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            asset_name: dynon-efis-d100-parser-linux-x86_64
-            pyinstaller_name: dynon-efis-d100-parser
-          - os: windows-latest
-            asset_name: dynon-efis-d100-parser-windows-x86_64.exe
-            pyinstaller_name: dynon-efis-d100-parser
-          - os: macos-latest
-            asset_name: dynon-efis-d100-parser-macos-arm64
-            pyinstaller_name: dynon-efis-d100-parser
+        os:
+          - { runner: ubuntu-latest, label: linux-x86_64, ext: "" }
+          - { runner: windows-latest, label: windows-x86_64, ext: ".exe" }
+          - { runner: macos-latest, label: macos-arm64, ext: "" }
+        tool:
+          # script  — entry point to freeze
+          # name    — base name of the produced executable
+          # extras  — pyproject optional-dependency group to install for the build
+          - { script: parse.py, name: dynon-efis-d100-parser, extras: "" }
+          - { script: charts.py, name: dynon-efis-d100-charts, extras: "charts" }
 
     steps:
       - name: Check out repository
@@ -35,24 +35,26 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install PyInstaller
-        run: pip install pyinstaller
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          pip install pyinstaller
+          if [ -n "${{ matrix.tool.extras }}" ]; then
+            pip install ".[${{ matrix.tool.extras }}]"
+          fi
 
       - name: Build executable
-        run: pyinstaller --onefile --name "${{ matrix.pyinstaller_name }}" parse.py
+        run: pyinstaller --onefile --name "${{ matrix.tool.name }}" "${{ matrix.tool.script }}"
 
       - name: Stage artifact
         shell: bash
         run: |
           mkdir -p staging
-          if [ -f "dist/${{ matrix.pyinstaller_name }}.exe" ]; then
-            cp "dist/${{ matrix.pyinstaller_name }}.exe" "staging/${{ matrix.asset_name }}"
-          else
-            cp "dist/${{ matrix.pyinstaller_name }}" "staging/${{ matrix.asset_name }}"
-          fi
+          asset="${{ matrix.tool.name }}-${{ github.ref_name }}-${{ matrix.os.label }}${{ matrix.os.ext }}"
+          cp "dist/${{ matrix.tool.name }}${{ matrix.os.ext }}" "staging/${asset}"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: staging/${{ matrix.asset_name }}
+          files: staging/${{ matrix.tool.name }}-${{ github.ref_name }}-${{ matrix.os.label }}${{ matrix.os.ext }}
           fail_on_unmatched_files: true
