@@ -1,0 +1,15 @@
+[project]
+name = "dynon-efis-d100-serial-data-output-parser"
+version = "0.0.0"
+description = "Parse a Dynon EFIS D100 RS-232 serial dump into CSV."
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+# Development / test dependencies. Install with:
+#   pip install -e ".[dev]"   (or simply: pip install pytest)
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "-ra"
