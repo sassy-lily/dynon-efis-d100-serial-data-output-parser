@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dynon-efis-d100-serial-data-output-parser"
 version = "0.0.0"
 description = "Parse a Dynon EFIS D100 RS-232 serial dump into CSV."
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 
 [tool.setuptools]
 # Single-script project: the only importable module is parse.py. State it
