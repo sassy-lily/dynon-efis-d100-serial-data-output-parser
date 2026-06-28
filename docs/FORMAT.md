@@ -61,13 +61,42 @@ second *on average* — but it is **not** a sub-second offset derived from the
 real-time clock, and the two are **not phase-locked**:
 
 - The counter is **never reset on a second boundary.** Its `63 → 0` wrap falls at
-  a fixed-but-arbitrary phase inside the RTC second (wherever the counter happened
-  to sit when the clock started), so the wrap and the seconds tick generally do
-  not coincide.
-- The instantaneous output rate **jitters.** In a 221,309-record capture the rate
-  averaged *exactly* 64.0000 frames per wall-clock second, yet individual seconds
-  held anywhere from **55 to 73 frames**. Because the RTC second and the frame
-  counter advance on independent clocks, their phase drifts continuously.
+  some phase offset inside the RTC second, so the wrap and the seconds tick
+  generally do not coincide.
+- The frame counter and the RTC second **share a time base** (they are rate-locked,
+  not independent), but the second boundary **wobbles in phase** by a few frames.
+
+### The phase wobble
+
+In a 221,309-record capture the frame rate averaged **exactly 64.0000** frames per
+wall-clock second with **zero long-term drift**, yet individual seconds held
+anywhere from **55 to 73 frames** (the bulk between 60 and 68). This is *not* two
+clocks drifting apart — the evidence shows the opposite:
+
+- **Rate-locked, no drift.** The phase at which each second boundary lands (the
+  counter value of the first frame of each new second) stays pinned in a narrow
+  ~5-frame band for the entire ~57-minute capture and **mean-reverts**; it never
+  walks through the full 0–63 range. Two independent oscillators would beat — the
+  boundary would slide steadily through all 64 values and the mean would not be an
+  integer.
+- **Neighbours compensate.** A long second immediately borrows from the next: a
+  73-frame second is followed by a 55-frame one, and **consecutive counts sum back
+  to ≈128 (= 2 × 64)**. Over any longer window the total returns to `64 × n`.
+
+So the counter is steady (always `+1`, no gaps) and the seconds are contiguous
+(always `+1`, no skips); only the *placement* of the second boundary within the
+steady frame stream jitters by ±2 frames typically, rarely up to ±9.
+
+**Likely cause (inference — Dynon does not publish the firmware internals).** The
+EFIS assembles and transmits each frame from a soft-timed processing loop whose
+*average* cadence is disciplined to the same oscillator as the clock (hence exactly
+64/sec and no drift), but whose *per-iteration* timing varies by a few milliseconds
+as the workload varies (AHRS/sensor fusion, display rendering, serial output,
+menu handling). The seconds field is bumped by a steady 1 Hz tick, so a frame
+landing just before vs. just after that tick shifts the apparent boundary. The rare
+±9 excursions (≈140 ms, ~1% of seconds) are consistent with an occasional heavier
+task or a brief interrupt-disabled section stalling frame output. It is **emission-
+timing jitter against a shared clock, not a clock-rate error.**
 
 The practical consequence: in real captures the Fractions counter rolls over
 mid-second, and the seconds value advances while Fractions is non-zero. This is
