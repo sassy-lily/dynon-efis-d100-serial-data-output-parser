@@ -217,24 +217,27 @@ def main(argv: collections.abc.Iterable[str] | None = None) -> None:
     corrupted_lines = 0
     valid_lines = 0
     current_line = 0
-    with open(arguments.input, 'rt') as input_file, open(arguments.output, 'wt', newline='') as output_file:
-        writer = csv.writer(output_file)
-        writer.writerow(headers)
-        for line in input_file:
-            current_line += 1
-            try:
-                record = parse_line(line)
-            except InvalidRecordException as exception:
-                logger.warning('line %d has been skipped: invalid record (%s)', current_line, exception)
-                skipped_lines += 1
-                continue
-            except CorruptedRecordException as exception:
-                logger.warning('line %d has been skipped: corrupted record (%s)', current_line, exception)
-                corrupted_lines += 1
-                continue
-            row = get_row(record, converter)
-            writer.writerow(row)
-            valid_lines += 1
+    try:
+        with open(arguments.input, 'rt') as input_file, open(arguments.output, 'wt', newline='') as output_file:
+            writer = csv.writer(output_file)
+            writer.writerow(headers)
+            for line in input_file:
+                current_line += 1
+                try:
+                    record = parse_line(line)
+                except InvalidRecordException as exception:
+                    logger.warning('line %d has been skipped: invalid record (%s)', current_line, exception)
+                    skipped_lines += 1
+                    continue
+                except CorruptedRecordException as exception:
+                    logger.warning('line %d has been skipped: corrupted record (%s)', current_line, exception)
+                    corrupted_lines += 1
+                    continue
+                row = get_row(record, converter)
+                writer.writerow(row)
+                valid_lines += 1
+    except OSError as exception:
+        parser.error(f'cannot open {exception.filename}: {exception.strerror}')
     logger.info('skipped lines: %d', skipped_lines)
     logger.info('corrupted lines: %d', corrupted_lines)
     logger.info('valid lines: %d', valid_lines)
